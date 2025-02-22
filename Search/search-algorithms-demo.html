@@ -32,25 +32,23 @@
         }
 
         #maze {
-            border-collapse: collapse;
-            touch-action: none;
-            /* Prevent default touch actions */
-            -webkit-touch-callout: none;
-            /* Prevent callout on long-press */
-            -webkit-user-select: none;
-            /* Prevent text selection */
-            user-select: none;
-        }
+    border-collapse: collapse;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
 
-        #maze td {
-            width: 25px;
-            height: 25px;
-            border: 1px solid #eee;
-            text-align: center;
-            cursor: pointer;
-            position: relative;
-            touch-action: none;
-        }
+#maze td {
+    width: 25px;
+    height: 25px;
+    border: 1px solid #eee;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    touch-action: none;
+}
+
 
         #maze td.wall {
             background-color: black;
@@ -166,35 +164,35 @@
             }
 
             function initializeGrid() {
-                shouldStopSearch = true;
-                isSearching = false;
-                mazeGrid = [];
-                mazeTable.innerHTML = '';
-                for (let r = 0; r < rows; r++) {
-                    const row = document.createElement('tr');
-                    mazeGrid.push([]);
-                    for (let c = 0; c < cols; c++) {
-                        const cell = document.createElement('td');
-                        cell.dataset.row = r;
-                        cell.dataset.col = c;
-                        cell.classList.add('empty');
+    shouldStopSearch = true;
+    isSearching = false;
+    mazeGrid = [];
+    mazeTable.innerHTML = '';
+    for (let r = 0; r < rows; r++) {
+        const row = document.createElement('tr');
+        mazeGrid.push([]);
+        for (let c = 0; c < cols; c++) {
+            const cell = document.createElement('td');
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            cell.classList.add('empty');
+            
+            // Mouse events for desktop
+            cell.addEventListener('click', handleCellClick);
+            cell.addEventListener('mousedown', handleCellMouseDown);
+            cell.addEventListener('mouseover', handleCellMouseOver);
+            cell.addEventListener('mouseup', handleCellMouseUp);
+            
+            // Single touch event for mobile
+            cell.addEventListener('touchstart', handleCellTouch, { passive: false });
+            
+            row.appendChild(cell);
+            mazeGrid[r].push('empty');
+        }
+        mazeTable.appendChild(row);
+    }
+}
 
-                        // Add both mouse and touch events
-                        cell.addEventListener('click', handleCellClick);
-                        cell.addEventListener('mousedown', handleCellMouseDown);
-                        cell.addEventListener('mouseover', handleCellMouseOver);
-                        cell.addEventListener('mouseup', handleCellMouseUp);
-
-                        // Add touch events
-                        cell.addEventListener('touchstart', handleCellTouch, { passive: false });
-                        cell.addEventListener('touchmove', handleCellTouch, { passive: false });
-
-                        row.appendChild(cell);
-                        mazeGrid[r].push('empty');
-                    }
-                    mazeTable.appendChild(row);
-                }
-            }
 
             function handleCellMouseDown(event) {
                 event.preventDefault(); // Prevent default touch behavior
@@ -211,20 +209,22 @@
 
 
             function handleCellTouch(event) {
-                event.preventDefault(); // Prevent default touch behavior
-                const touch = event.touches[0];
-                const cell = document.elementFromPoint(touch.clientX, touch.clientY);
-                if (cell && cell.tagName === 'TD') {
-                    if (cell.classList.contains('start') || cell.classList.contains('end')) {
-                        return;
-                    }
-                    if (cell.classList.contains('wall')) {
-                        setCellType(cell, 'empty');
-                    } else {
-                        setCellType(cell, 'wall');
-                    }
-                }
-            }
+    event.preventDefault(); // Prevent default touch behavior
+    const touch = event.touches[0];
+    const cell = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (cell && cell.tagName === 'TD') {
+        if (cell.classList.contains('start') || cell.classList.contains('end')) {
+            return;
+        }
+        // Toggle wall state
+        if (cell.classList.contains('wall')) {
+            setCellType(cell, 'empty');
+        } else {
+            setCellType(cell, 'wall');
+        }
+    }
+}
+
 
             function handleCellMouseOver(event) {
                 if (!isSettingWall) return;
