@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Search Demo</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .controls > div {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #maze-container {
+            border: 1px solid #ccc;
+        }
+
+        #maze {
+            border-collapse: collapse;
+        }
+
+        #maze td {
+            width: 25px;
+            height: 25px;
+            border: 1px solid #eee;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        #maze td.wall {
+            background-color: black;
+            
+        }
+
+        #maze td.visited {
+            background-color: lightblue;
+            z-index: 1;
+        }
+
+        #maze td.path {
+            background-color: yellow;
+            z-index: 2;
+            position: relative;
+        }
+
+        #maze td.current {
+            background-color: orange;
+            transition: background-color 0.2s;
+            z-index: 3;
+            position: relative;
+        }
+
+        #maze td.start {
+            background-color: green;
+            color: white;
+            z-index: 4;
+            position: relative;
+        }
+
+        #maze td.end {
+            background-color: red;
+            color: white;
+            z-index: 4;
+            position: relative;
+        }
+
+        #message {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <div>
+            <label for="algorithm">Algorithm:</label>
+            <select id="algorithm">
+                <option value="bfs">BFS</option>
+                <option value="dfs">DFS</option>
+                <option value="greedy">Greedy Search</option>
+                <option value="aStar">A*</option>
+            </select>
+        </div>
+        <div id="heuristic-selector" style="display: none;">
+            <label for="heuristic">Heuristic:</label>
+            <select id="heuristic">
+                <option value="euclidean">Euclidean Distance</option>
+                <option value="manhattan">Manhattan Distance</option>
+                <option value="vertical">Vertical Distance</option>
+                <option value="horizontal">Horizontal Distance</option>
+            </select>
+        </div>
+        <div>
+            <button id="run-button">Run Algorithm</button>
+            <button id="clear-button">Clear Maze</button>
+        </div>
+        <div id="message"></div>
+    </div>
+    <div id="maze-container">
+        <table id="maze"></table>
+    </div>
+
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const algorithmSelector = document.getElementById('algorithm');
+            const heuristicSelectorDiv = document.getElementById('heuristic-selector');
+            const heuristicSelector = document.getElementById('heuristic');
+            const runButton = document.getElementById('run-button');
+            const clearButton = document.getElementById('clear-button');
+            const messageDiv = document.getElementById('message');
+            const mazeTable = document.getElementById('maze');
+
+            const rows = 20;
+            const cols = 20;
+            let mazeGrid = [];
+            let startCell = null;
+            let endCell = null;
+            let isSettingWall = false;
+            let cellTypeToSet = 'wall';
+            let isSearching = false;
+            let shouldStopSearch = false;
+
+            const visualizationDelay = 50;
+
+            async function visualizeCurrentNode(pos, previousPos = null) {
+                if (shouldStopSearch) return;
+                
+                if (previousPos) {
+                    const previousCell = mazeTable.rows[previousPos.row].cells[previousPos.col];
+                    previousCell.classList.remove('current');
+                }
+                
+                const currentCell = mazeTable.rows[pos.row].cells[pos.col];
+                if (!currentCell.classList.contains('start') && !currentCell.classList.contains('end')) {
+                    currentCell.classList.add('current');
+                    await new Promise(resolve => setTimeout(resolve, visualizationDelay));
+                    if (!shouldStopSearch) {
+                        currentCell.classList.remove('current');
+                    }
+                }
+            }
+
+            function initializeGrid() {
+                shouldStopSearch = true;
+                isSearching = false;
+                mazeGrid = [];
+                mazeTable.innerHTML = '';
+                for (let r = 0; r < rows; r++) {
+                    const row = document.createElement('tr');
+                    mazeGrid.push([]);
+                    for (let c = 0; c < cols; c++) {
+                        const cell = document.createElement('td');
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+                        cell.classList.add('empty');
+                        cell.addEventListener('click', handleCellClick);
+                        cell.addEventListener('mousedown', handleCellMouseDown);
+                        cell.addEventListener('mouseover', handleCellMouseOver);
+                        cell.addEventListener('mouseup', handleCellMouseUp);
+                        row.appendChild(cell);
+                        mazeGrid[r].push('empty');
+                    }
+                    mazeTable.appendChild(row);
+                }
+            }
+
+            function handleCellMouseDown(event) {
+    const cell = event.target;
+    if (cell.tagName === 'TD') {
+        if (cell.classList.contains('start') || cell.classList.contains('end')) {
+            return;
+        }
+        isSettingWall = true;
+        // Set cellTypeToSet based on whether we're creating or removing walls
+        cellTypeToSet = cell.classList.contains('wall') ? 'empty' : 'wall';
+        setCellType(cell, cellTypeToSet);
+    }
+}
+
+function handleCellMouseOver(event) {
+    if (!isSettingWall) return;
+    const cell = event.target;
+    if (cell.tagName === 'TD') {
+        if (cell.classList.contains('start') || cell.classList.contains('end')) {
+            return;
+        }
+        // Use the same cellTypeToSet that was determined in mouseDown
+        setCellType(cell, cellTypeToSet);
+    }
+}
+
+
+            function handleCellMouseUp() {
+                isSettingWall = false;
+            }
+
+            function handleCellClick(event) {
+    const cell = event.target;
+    if (cell.tagName !== 'TD') return;
+
+    if (cell.classList.contains('start')) {
+        removeStartOrEnd(startCell, 'start');
+        startCell = null;
+    } else if (cell.classList.contains('end')) {
+        removeStartOrEnd(endCell, 'end');
+        endCell = null;
+    } else if (startCell === null) {
+        setStart(cell);
+    } else if (endCell === null) {
+        setEnd(cell);
+    } else if (cell.classList.contains('wall')) {
+        // Remove wall if clicking on existing wall
+        setCellType(cell, 'empty');
+    } else {
+        // Set wall if clicking on empty cell
+        setWall(cell);
+    }
+}
+
+
+            function setCellType(cell, type) {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+
+                if (cell.classList.contains('start') || cell.classList.contains('end')) {
+                    return;
+                }
+
+                cell.classList.remove('empty', 'wall', 'start', 'end', 'path', 'visited', 'current');
+                cell.classList.add(type);
+                mazeGrid[row][col] = type;
+            }
+
+            function setStart(cell) {
+                if (startCell) {
+                    removeStartOrEnd(startCell, 'start');
+                }
+                startCell = cell;
+                setCellType(cell, 'start');
+            }
+
+            function setEnd(cell) {
+                if (endCell) {
+                    removeStartOrEnd(endCell, 'end');
+                }
+                endCell = cell;
+                setCellType(cell, 'end');
+            }
+
+            function setWall(cell) {
+                if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
+                    setCellType(cell, 'wall');
+                }
+            }
+
+            function removeStartOrEnd(cell, type) {
+                if (cell) {
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    cell.classList.remove('empty', 'wall', 'start', 'end', 'path', 'visited', 'current');
+                    cell.classList.add('empty');
+                    mazeGrid[row][col] = 'empty';
+                }
+                if (type === 'start') startCell = null;
+                if (type === 'end') endCell = null;
+            }
+
+            function clearPath() {
+                const pathCells = document.querySelectorAll('#maze td.path, #maze td.visited, #maze td.current');
+                pathCells.forEach(cell => {
+                    if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
+                        cell.classList.remove('path', 'visited', 'current');
+                        cell.classList.add('empty');
+                        const row = parseInt(cell.dataset.row);
+                        const col = parseInt(cell.dataset.col);
+                        mazeGrid[row][col] = 'empty';
+                    }
+                });
+            }
+
+            async function visualizePath(path) {
+                if (shouldStopSearch) return;
+                for (const pos of path) {
+                    const cell = mazeTable.rows[pos.row].cells[pos.col];
+                    if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
+                        cell.classList.remove('visited');
+                        cell.classList.add('path');
+                        await new Promise(resolve => setTimeout(resolve, 20));
+                    }
+                }
+            }
+            async function bfs(maze, start, end) {
+                const queue = [[start]];
+                const visited = new Set([`${start.row},${start.col}`]);
+                const cameFrom = {};
+                let previousPos = null;
+
+                while (queue.length > 0 && !shouldStopSearch) {
+                    const currentPath = queue.shift();
+                    const currentPos = currentPath[currentPath.length - 1];
+
+                    await visualizeCurrentNode(currentPos, previousPos);
+                    previousPos = currentPos;
+
+                    if (currentPos.row === end.row && currentPos.col === end.col) {
+                        return currentPath;
+                    }
+
+                    const neighbors = getNeighbors(currentPos, maze);
+                    for (const neighbor of neighbors) {
+                        if (shouldStopSearch) return null;
+                        
+                        const neighborKey = `${neighbor.row},${neighbor.col}`;
+                        if (!visited.has(neighborKey)) {
+                            visited.add(neighborKey);
+                            cameFrom[neighborKey] = currentPos;
+                            const newPath = [...currentPath, neighbor];
+                            queue.push(newPath);
+
+                            const cell = mazeTable.rows[neighbor.row].cells[neighbor.col];
+                            if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
+                                cell.classList.add('visited');
+                                await new Promise(resolve => setTimeout(resolve, visualizationDelay));
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            async function dfs(maze, start, end) {
+                const stack = [[start]];
+                const visited = new Set([`${start.row},${start.col}`]);
+                const cameFrom = {};
+                let previousPos = null;
+
+                while (stack.length > 0 && !shouldStopSearch) {
+                    const currentPath = stack.pop();
+                    const currentPos = currentPath[currentPath.length - 1];
+
+                    await visualizeCurrentNode(currentPos, previousPos);
+                    previousPos = currentPos;
+
+                    if (currentPos.row === end.row && currentPos.col === end.col) {
+                        return currentPath;
+                    }
+
+                    const neighbors = getNeighbors(currentPos, maze);
+                    for (const neighbor of neighbors.reverse()) {
+                        if (shouldStopSearch) return null;
+
+                        const neighborKey = `${neighbor.row},${neighbor.col}`;
+                        if (!visited.has(neighborKey)) {
+                            visited.add(neighborKey);
+                            cameFrom[neighborKey] = currentPos;
+                            const newPath = [...currentPath, neighbor];
+                            stack.push(newPath);
+
+                            const cell = mazeTable.rows[neighbor.row].cells[neighbor.col];
+                            if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
+                                cell.classList.add('visited');
+                                await new Promise(resolve => setTimeout(resolve, visualizationDelay));
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            async function greedySearch(maze, start, end, heuristicType) {
+                const priorityQueue = new PriorityQueue();
+                priorityQueue.enqueue({ position: start, path: [start] }, calculateHeuristic(start, end, heuristicType));
+                const visited = new Set([`${start.row},${start.col}`]);
+                const cameFrom = {};
+                let previousPos = null;
+
+                while (!priorityQueue.isEmpty() && !shouldStopSearch) {
+                    const { element: currentItem } = priorityQueue.dequeue();
+                    const currentPos = currentItem.position;
+                    const currentPath = currentItem.path;
+
+                    await visualizeCurrentNode(currentPos, previousPos);
+                    previousPos = currentPos;
+
+                    if (currentPos.row === end.row && currentPos.col === end.col) {
+                        return currentPath;
+                    }
+
+                    const neighbors = getNeighbors(currentPos, maze);
+                    for (const neighbor of neighbors) {
+                        if (shouldStopSearch) return null;
+
+                        const neighborKey = `${neighbor.row},${neighbor.col}`;
+                        if (!visited.has(neighborKey)) {
+                            visited.add(neighborKey);
+                            cameFrom[neighborKey] = currentPos;
+                            const newPath = [...currentPath, neighbor];
+                            priorityQueue.enqueue(
+                                { position: neighbor, path: newPath },
+                                calculateHeuristic(neighbor, end, heuristicType)
+                            );
+
+                            const cell = mazeTable.rows[neighbor.row].cells[neighbor.col];
+                            if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
+                                cell.classList.add('visited');
+                                await new Promise(resolve => setTimeout(resolve, visualizationDelay));
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            async function aStarSearch(maze, start, end, heuristicType) {
+                const priorityQueue = new PriorityQueue();
+                priorityQueue.enqueue({ position: start, path: [start], gScore: 0 }, calculateHeuristic(start, end, heuristicType));
+                const cameFrom = {};
+                const gScore = { [`${start.row},${start.col}`]: 0 };
+                const fScore = { [`${start.row},${start.col}`]: calculateHeuristic(start, end, heuristicType) };
+                const visited = new Set([`${start.row},${start.col}`]);
+                let previousPos = null;
+
+                while (!priorityQueue.isEmpty() && !shouldStopSearch) {
+                    const { element: currentItem } = priorityQueue.dequeue();
+                    const currentPos = currentItem.position;
+                    const currentPath = currentItem.path;
+
+                    await visualizeCurrentNode(currentPos, previousPos);
+                    previousPos = currentPos;
+
+                    if (currentPos.row === end.row && currentPos.col === end.col) {
+                        return currentPath;
+                    }
+
+                    const neighbors = getNeighbors(currentPos, maze);
+                    for (const neighbor of neighbors) {
+                        if (shouldStopSearch) return null;
+
+                        const tentativeGScore = gScore[`${currentPos.row},${currentPos.col}`] + 1;
+                        const neighborKey = `${neighbor.row},${neighbor.col}`;
+
+                        if (!visited.has(neighborKey) || tentativeGScore < gScore[neighborKey] || gScore[neighborKey] === undefined) {
+                            cameFrom[neighborKey] = currentPos;
+                            gScore[neighborKey] = tentativeGScore;
+                            fScore[neighborKey] = tentativeGScore + calculateHeuristic(neighbor, end, heuristicType);
+                            priorityQueue.enqueue(
+                                { position: neighbor, path: [...currentPath, neighbor], gScore: tentativeGScore },
+                                fScore[neighborKey]
+                            );
+                            visited.add(neighborKey);
+
+                            const cell = mazeTable.rows[neighbor.row].cells[neighbor.col];
+                            if (!cell.classList.contains('start') && !cell.classList.contains('end')) {
+                                cell.classList.add('visited');
+                                await new Promise(resolve => setTimeout(resolve, visualizationDelay));
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            function getNeighbors(pos, maze) {
+                const neighbors = [];
+                const directions = [
+                    { row: 0, col: 1 },
+                    { row: 0, col: -1 },
+                    { row: 1, col: 0 },
+                    { row: -1, col: 0 }
+                ];
+
+                for (const dir of directions) {
+                    const newRow = pos.row + dir.row;
+                    const newCol = pos.col + dir.col;
+
+                    if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols && maze[newRow][newCol] === 0) {
+                        neighbors.push({ row: newRow, col: newCol });
+                    }
+                }
+                return neighbors;
+            }
+
+            function calculateHeuristic(pos, end, heuristicType) {
+                switch (heuristicType) {
+                    case 'euclidean':
+                        return euclideanDistance(pos, end);
+                    case 'manhattan':
+                        return manhattanDistance(pos, end);
+                    case 'vertical':
+                        return verticalDistance(pos, end);
+                    case 'horizontal':
+                        return horizontalDistance(pos, end);
+                    default:
+                        return 0;
+                }
+            }
+
+            function euclideanDistance(p1, p2) {
+                return Math.sqrt(Math.pow(p2.col - p1.col, 2) + Math.pow(p2.row - p1.row, 2));
+            }
+
+            function manhattanDistance(p1, p2) {
+                return Math.abs(p2.col - p1.col) + Math.abs(p2.row - p1.row);
+            }
+
+            function verticalDistance(p1, p2) {
+                return Math.abs(p2.row - p1.row);
+            }
+
+            function horizontalDistance(p1, p2) {
+                return Math.abs(p2.col - p1.col);
+            }
+
+            function PriorityQueue() {
+                this.elements = [];
+
+                this.isEmpty = function() {
+                    return this.elements.length === 0;
+                };
+
+                this.enqueue = function(element, priority) {
+                    this.elements.push({ element: element, priority: priority });
+                    this.elements.sort((a, b) => a.priority - b.priority);
+                };
+
+                this.dequeue = function() {
+                    return this.elements.shift();
+                };
+            }
+            clearButton.addEventListener('click', () => {
+                shouldStopSearch = true;
+                isSearching = false;
+                initializeGrid();
+                startCell = null;
+                endCell = null;
+                messageDiv.textContent = '';
+            });
+
+            algorithmSelector.addEventListener('change', () => {
+                const selectedAlgorithm = algorithmSelector.value;
+                if (selectedAlgorithm === 'greedy' || selectedAlgorithm === 'aStar') {
+                    heuristicSelectorDiv.style.display = 'flex';
+                } else {
+                    heuristicSelectorDiv.style.display = 'none';
+                }
+            });
+
+            runButton.addEventListener('click', async () => {
+                if (isSearching) {
+                    messageDiv.textContent = 'Search already in progress...';
+                    return;
+                }
+
+                if (!startCell || !endCell) {
+                    messageDiv.textContent = 'Please set both start and end cells.';
+                    return;
+                }
+
+                shouldStopSearch = false;
+                isSearching = true;
+                messageDiv.textContent = 'Running Algorithm...';
+
+                clearPath();
+
+                const algorithm = algorithmSelector.value;
+                let heuristicType = heuristicSelector.value;
+                let path = null;
+
+                try {
+                    const startPos = { 
+                        row: parseInt(startCell.dataset.row), 
+                        col: parseInt(startCell.dataset.col) 
+                    };
+                    const endPos = { 
+                        row: parseInt(endCell.dataset.row), 
+                        col: parseInt(endCell.dataset.col) 
+                    };
+
+                    const numericalMaze = mazeGrid.map(row =>
+                        row.map(cellType => cellType === 'wall' ? 1 : 0)
+                    );
+
+                    if (algorithm === 'bfs') {
+                        path = await bfs(numericalMaze, startPos, endPos);
+                    } else if (algorithm === 'dfs') {
+                        path = await dfs(numericalMaze, startPos, endPos);
+                    } else if (algorithm === 'greedy') {
+                        path = await greedySearch(numericalMaze, startPos, endPos, heuristicType);
+                    } else if (algorithm === 'aStar') {
+                        path = await aStarSearch(numericalMaze, startPos, endPos, heuristicType);
+                    }
+
+                    if (!shouldStopSearch && path) {
+                        messageDiv.textContent = 'Goal Found!';
+                        await visualizePath(path);
+                    } else if (!shouldStopSearch) {
+                        messageDiv.textContent = 'No Path Found.';
+                    }
+                } catch (error) {
+                    console.error('Search error:', error);
+                    messageDiv.textContent = 'Search error occurred.';
+                } finally {
+                    isSearching = false;
+                }
+            });
+
+            // Prevent dragging behavior on the maze
+            mazeTable.addEventListener('dragstart', (e) => e.preventDefault());
+            
+            // Initialize the grid when the page loads
+            initializeGrid();
+        });
+    </script>
+</body>
+</html>
