@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,7 +21,7 @@
             align-items: center;
         }
 
-        .controls > div {
+        .controls>div {
             display: flex;
             align-items: center;
             gap: 5px;
@@ -32,6 +33,13 @@
 
         #maze {
             border-collapse: collapse;
+            touch-action: none;
+            /* Prevent default touch actions */
+            -webkit-touch-callout: none;
+            /* Prevent callout on long-press */
+            -webkit-user-select: none;
+            /* Prevent text selection */
+            user-select: none;
         }
 
         #maze td {
@@ -41,11 +49,12 @@
             text-align: center;
             cursor: pointer;
             position: relative;
+            touch-action: none;
         }
 
         #maze td.wall {
             background-color: black;
-            
+
         }
 
         #maze td.visited {
@@ -61,7 +70,7 @@
 
         #maze td.current {
             background-color: orange;
-            transition: background-color 0.2s;
+            transition: background-color 0.02s;
             z-index: 3;
             position: relative;
         }
@@ -85,6 +94,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="controls">
         <div>
@@ -115,7 +125,7 @@
         <table id="maze"></table>
     </div>
 
-<script>
+    <script>
         document.addEventListener('DOMContentLoaded', () => {
             const algorithmSelector = document.getElementById('algorithm');
             const heuristicSelectorDiv = document.getElementById('heuristic-selector');
@@ -139,12 +149,12 @@
 
             async function visualizeCurrentNode(pos, previousPos = null) {
                 if (shouldStopSearch) return;
-                
+
                 if (previousPos) {
                     const previousCell = mazeTable.rows[previousPos.row].cells[previousPos.col];
                     previousCell.classList.remove('current');
                 }
-                
+
                 const currentCell = mazeTable.rows[pos.row].cells[pos.col];
                 if (!currentCell.classList.contains('start') && !currentCell.classList.contains('end')) {
                     currentCell.classList.add('current');
@@ -168,10 +178,17 @@
                         cell.dataset.row = r;
                         cell.dataset.col = c;
                         cell.classList.add('empty');
+
+                        // Add both mouse and touch events
                         cell.addEventListener('click', handleCellClick);
                         cell.addEventListener('mousedown', handleCellMouseDown);
                         cell.addEventListener('mouseover', handleCellMouseOver);
                         cell.addEventListener('mouseup', handleCellMouseUp);
+
+                        // Add touch events
+                        cell.addEventListener('touchstart', handleCellTouch, { passive: false });
+                        cell.addEventListener('touchmove', handleCellTouch, { passive: false });
+
                         row.appendChild(cell);
                         mazeGrid[r].push('empty');
                     }
@@ -180,29 +197,46 @@
             }
 
             function handleCellMouseDown(event) {
-    const cell = event.target;
-    if (cell.tagName === 'TD') {
-        if (cell.classList.contains('start') || cell.classList.contains('end')) {
-            return;
-        }
-        isSettingWall = true;
-        // Set cellTypeToSet based on whether we're creating or removing walls
-        cellTypeToSet = cell.classList.contains('wall') ? 'empty' : 'wall';
-        setCellType(cell, cellTypeToSet);
-    }
-}
+                event.preventDefault(); // Prevent default touch behavior
+                const cell = event.target;
+                if (cell.tagName === 'TD') {
+                    if (cell.classList.contains('start') || cell.classList.contains('end')) {
+                        return;
+                    }
+                    isSettingWall = true;
+                    cellTypeToSet = cell.classList.contains('wall') ? 'empty' : 'wall';
+                    setCellType(cell, cellTypeToSet);
+                }
+            }
 
-function handleCellMouseOver(event) {
-    if (!isSettingWall) return;
-    const cell = event.target;
-    if (cell.tagName === 'TD') {
-        if (cell.classList.contains('start') || cell.classList.contains('end')) {
-            return;
-        }
-        // Use the same cellTypeToSet that was determined in mouseDown
-        setCellType(cell, cellTypeToSet);
-    }
-}
+
+            function handleCellTouch(event) {
+                event.preventDefault(); // Prevent default touch behavior
+                const touch = event.touches[0];
+                const cell = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (cell && cell.tagName === 'TD') {
+                    if (cell.classList.contains('start') || cell.classList.contains('end')) {
+                        return;
+                    }
+                    if (cell.classList.contains('wall')) {
+                        setCellType(cell, 'empty');
+                    } else {
+                        setCellType(cell, 'wall');
+                    }
+                }
+            }
+
+            function handleCellMouseOver(event) {
+                if (!isSettingWall) return;
+                const cell = event.target;
+                if (cell.tagName === 'TD') {
+                    if (cell.classList.contains('start') || cell.classList.contains('end')) {
+                        return;
+                    }
+                    // Use the same cellTypeToSet that was determined in mouseDown
+                    setCellType(cell, cellTypeToSet);
+                }
+            }
 
 
             function handleCellMouseUp() {
@@ -210,27 +244,27 @@ function handleCellMouseOver(event) {
             }
 
             function handleCellClick(event) {
-    const cell = event.target;
-    if (cell.tagName !== 'TD') return;
+                const cell = event.target;
+                if (cell.tagName !== 'TD') return;
 
-    if (cell.classList.contains('start')) {
-        removeStartOrEnd(startCell, 'start');
-        startCell = null;
-    } else if (cell.classList.contains('end')) {
-        removeStartOrEnd(endCell, 'end');
-        endCell = null;
-    } else if (startCell === null) {
-        setStart(cell);
-    } else if (endCell === null) {
-        setEnd(cell);
-    } else if (cell.classList.contains('wall')) {
-        // Remove wall if clicking on existing wall
-        setCellType(cell, 'empty');
-    } else {
-        // Set wall if clicking on empty cell
-        setWall(cell);
-    }
-}
+                if (cell.classList.contains('start')) {
+                    removeStartOrEnd(startCell, 'start');
+                    startCell = null;
+                } else if (cell.classList.contains('end')) {
+                    removeStartOrEnd(endCell, 'end');
+                    endCell = null;
+                } else if (startCell === null) {
+                    setStart(cell);
+                } else if (endCell === null) {
+                    setEnd(cell);
+                } else if (cell.classList.contains('wall')) {
+                    // Remove wall if clicking on existing wall
+                    setCellType(cell, 'empty');
+                } else {
+                    // Set wall if clicking on empty cell
+                    setWall(cell);
+                }
+            }
 
 
             function setCellType(cell, type) {
@@ -324,7 +358,7 @@ function handleCellMouseOver(event) {
                     const neighbors = getNeighbors(currentPos, maze);
                     for (const neighbor of neighbors) {
                         if (shouldStopSearch) return null;
-                        
+
                         const neighborKey = `${neighbor.row},${neighbor.col}`;
                         if (!visited.has(neighborKey)) {
                             visited.add(neighborKey);
@@ -529,16 +563,16 @@ function handleCellMouseOver(event) {
             function PriorityQueue() {
                 this.elements = [];
 
-                this.isEmpty = function() {
+                this.isEmpty = function () {
                     return this.elements.length === 0;
                 };
 
-                this.enqueue = function(element, priority) {
+                this.enqueue = function (element, priority) {
                     this.elements.push({ element: element, priority: priority });
                     this.elements.sort((a, b) => a.priority - b.priority);
                 };
 
-                this.dequeue = function() {
+                this.dequeue = function () {
                     return this.elements.shift();
                 };
             }
@@ -582,13 +616,13 @@ function handleCellMouseOver(event) {
                 let path = null;
 
                 try {
-                    const startPos = { 
-                        row: parseInt(startCell.dataset.row), 
-                        col: parseInt(startCell.dataset.col) 
+                    const startPos = {
+                        row: parseInt(startCell.dataset.row),
+                        col: parseInt(startCell.dataset.col)
                     };
-                    const endPos = { 
-                        row: parseInt(endCell.dataset.row), 
-                        col: parseInt(endCell.dataset.col) 
+                    const endPos = {
+                        row: parseInt(endCell.dataset.row),
+                        col: parseInt(endCell.dataset.col)
                     };
 
                     const numericalMaze = mazeGrid.map(row =>
@@ -621,10 +655,11 @@ function handleCellMouseOver(event) {
 
             // Prevent dragging behavior on the maze
             mazeTable.addEventListener('dragstart', (e) => e.preventDefault());
-            
+
             // Initialize the grid when the page loads
             initializeGrid();
         });
     </script>
 </body>
+
 </html>
